@@ -1,0 +1,17 @@
+3b2c17d0e7223db363ca4a624aa93029 *DESCRIPTION
+5626293dba479a34e0d844579edf5062 *NAMESPACE
+4543181cd4fd7edbd34184658f973b30 *R/plot_projection.r
+40b21e8c9f7cb59296e650fbcfbabd6c *R/project.r
+36688d07a0115048ac2914b042e4d8c8 *README.md
+dde79bcecbe19cb7de881d97f1937c97 *man/plot_projection.Rd
+378a94c21cb24ed6f68592f23bc55470 *man/pop.lion-package.Rd
+cf17787c4d6dd7c19cf13b6e4d60aac9 *man/project.Rd
+d57e9b2d275adbdb2edf8d2975c20ab7 *src/globals.h
+65781e9a9d7f166c4f7d620572e3a017 *src/main.c
+a76fc576321daaeec2e595fa7d3687f5 *src/mc.c
+930a535779b424596331d561cf28204e *src/mc.h
+d84d2ccbb4a3216ca784c302c6153b0f *src/pop.c
+1b99bedf9398b81cd9521e984606318b *src/pop.h
+64114d9494d9e7abf6f05e5be0aa43c1 *src/pop.lion_init.c
+aaa14247710bc1ec25a83f2d48a371f2 *src/tools.c
+c29f623598094a2bfc933806f0c86a13 *src/tools.h
