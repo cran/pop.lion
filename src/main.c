@@ -159,8 +159,25 @@ SEXP C_montecarlo (
     SET_VECTOR_ELT(list, 1, R_individuals);
     setAttrib(list, R_NamesSymbol, list_names);
     UNPROTECT(nprot);
+    
+    for (int i = 0; i < 2; i++) {
+        free(R_survival_av[i]);
+    }
+    free(R_survival_av);
 
-    mc_free_results(stats);
+    free(R_litter_distribution);
+    
+    for (int i = 0; i < LENGTH(SEXP_conflict_mortality)/R_mortality_cols; i++) {
+        free(R_conflict_mortality[i]);
+    }
+    free(R_conflict_mortality);
+
+    for (int i = 0; i < LENGTH(SEXP_hunting_mortality)/R_mortality_cols; i++) {
+        free(R_hunting_mortality[i]);
+    }
+    free(R_hunting_mortality);
+    
+    mc_free_statistics(stats);
 
     return(list);
 

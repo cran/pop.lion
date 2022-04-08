@@ -150,7 +150,6 @@ struct t_population {
 
     int number_indiv;
     int number_indiv_history;
-    double **history_indiv;
 
     double *live_stats;
 
@@ -166,7 +165,6 @@ struct t_population {
     t_coalition *all_coalitions;
 
     double survival[NUMBER_OF_SEXES][AGE_OLDEST];
-    //double litter_size;
 
     int initial_prides_coalitions;
     int K_individuals;

@@ -3,7 +3,8 @@ useDynLib(pop.lion, C_montecarlo)
 
 import(
   parallel,
-  abind
+  abind,
+  testthat
 )
 
 importFrom("grDevices", "colorRampPalette")

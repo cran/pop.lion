@@ -814,7 +814,7 @@ t_pride* pride_leaves_pop(t_population *pop, t_pride *current_pride) {
     for (int i = 0; i < current_pride->all_members->len; i++) {
         ((t_individual*)g_ptr_array_index(current_pride->all_members, i))->my_pride = NULL;
     }
-    g_ptr_array_empty(current_pride->all_members);
+    g_ptr_array_free(current_pride->all_members);
 
     // Tell coalition this pride is gone
     if (current_pride->the_coalition != NULL) {
@@ -873,7 +873,7 @@ t_coalition* coalition_leaves_pop(t_population *pop, t_coalition *current_coali)
     for (int i = 0; i < current_coali->all_members->len; i++) {
         ((t_individual*)g_ptr_array_index(current_coali->all_members, i))->my_coalition = NULL;
     }
-    g_ptr_array_empty(current_coali->all_members);
+    g_ptr_array_free(current_coali->all_members);
 
     // Tell prides their coalition is gone
     for (int i = 0; i < current_coali->the_prides->len; i++) {
@@ -959,135 +959,140 @@ void individuals_die(t_population *pop, long the_month) {
 
         if (current_idv->alive == 1) {
 
-            the_surv = pop->survival[current_idv->sex][current_idv->age];
-
-            rdie = rbinom(1, the_surv);
-
-            current_idv->alive = rdie;
-
             // Senescence
 
             if (current_idv->age >= AGE_OLDEST) {
 
                 current_idv->alive = 0;
 
-            }
+            } else {
 
-            // What happens to cubs
+                the_surv = pop->survival[current_idv->sex][current_idv->age];
+                if (current_idv->age >= 180) {
+                    Rprintf(" %d ", current_idv->age);
+                }
 
-            if (current_idv->alive == 0 && current_idv->litter->len > 0) {
+                rdie = rbinom(1, the_surv);
 
-                pride_has_surrogate_mum = 0;
+                current_idv->alive = rdie;
 
-                // Cub will die if:
-                // 1) younger than 12 months,
-                // 2) younger than 24 months and no mother older than 4 year in pride
+                // What happens to cubs
 
-                current_pride = current_idv->my_pride;
+                if (current_idv->alive == 0 && current_idv->litter->len > 0) {
 
-                for (int i = 0; i < current_pride->all_members->len; i++) {
+                    pride_has_surrogate_mum = 0;
 
-                    surrogate_idv = g_ptr_array_index(current_pride->all_members, i);
+                    // Cub will die if:
+                    // 1) younger than 12 months,
+                    // 2) younger than 24 months and no mother older than 4 year in pride
 
-                    if ( surrogate_idv->sex == FEMALE && surrogate_idv->age > AGE_SURROGATE ) {
+                    current_pride = current_idv->my_pride;
 
-                        pride_has_surrogate_mum = 1;
+                    for (int i = 0; i < current_pride->all_members->len; i++) {
 
-                        break;
+                        surrogate_idv = g_ptr_array_index(current_pride->all_members, i);
+
+                        if ( surrogate_idv->sex == FEMALE && surrogate_idv->age > AGE_SURROGATE ) {
+
+                            pride_has_surrogate_mum = 1;
+
+                            break;
+
+                        }
+
+                    }
+
+                    // Kill cubs if their mother died
+
+                    for (int i = 0; i < current_idv->litter->len; i++) {
+
+                        cub_idv = g_ptr_array_index(current_idv->litter, i);
+
+                        if (cub_idv->age <= AGE_CUB_DIE_WITHOUT_MOTHER) {
+
+                            cub_idv->alive = 0;
+
+                        } else if (cub_idv->age > AGE_CUB_DIE_WITHOUT_MOTHER
+                                   && cub_idv->age <= AGE_CUB_DIE_WITHOUT_SURROGATE
+                                   && pride_has_surrogate_mum == 0) {
+
+                            cub_idv->alive = 0;
+
+                        }
 
                     }
 
                 }
 
-                // Kill cubs if their mother died
+                // Cubs die from starvation when population is near carrying capacity - this is a common cause of mortality in the Serengeti which is near capacity.
 
-                for (int i = 0; i < current_idv->litter->len; i++) {
+                // Sarvation in the CORE
 
-                    cub_idv = g_ptr_array_index(current_idv->litter, i);
+                double pop_density;
 
-                    if (cub_idv->age <= AGE_CUB_DIE_WITHOUT_MOTHER) {
+                pop_density = (double)individuals_core/K_indiv_core;
 
-                        cub_idv->alive = 0;
+                if (current_idv->age <= 12
+                    && get_individual_edgedrisk(pop, current_idv) == 0
+                    && current_idv->alive == 1) {
 
-                    } else if (cub_idv->age > AGE_CUB_DIE_WITHOUT_MOTHER
-                               && cub_idv->age <= AGE_CUB_DIE_WITHOUT_SURROGATE
-                               && pride_has_surrogate_mum == 0) {
+                    cub_die = rbinom(1,(pop_density*STARVATION_1YR));
 
-                        cub_idv->alive = 0;
-
+                    if (cub_die == 1) {
+                        current_idv->alive = 0;
                     }
-
                 }
 
-            }
+                if (current_idv->age > 12
+                    && current_idv->age <= 24
+                    && get_individual_edgedrisk(pop, current_idv) == 0
+                    && current_idv->alive == 1) {
 
-            // Cubs die from starvation when population is near carrying capacity - this is a common cause of mortality in the Serengeti which is near capacity.
+                    cub_die = rbinom(1,(pop_density*STARVATION_2YR));
 
-            // Sarvation in the CORE
-
-            double pop_density;
-
-            pop_density = (double)individuals_core/K_indiv_core;
-
-            if (current_idv->age <= 12
-                && get_individual_edgedrisk(pop, current_idv) == 0
-                && current_idv->alive == 1) {
-
-                cub_die = rbinom(1,(pop_density*STARVATION_1YR));
-
-                if (cub_die == 1) {
-                    current_idv->alive = 0;
+                    if (cub_die == 1) {
+                        current_idv->alive = 0;
+                    }
                 }
-            }
 
-            if (current_idv->age > 12
-                && current_idv->age <= 24
-                && get_individual_edgedrisk(pop, current_idv) == 0
-                && current_idv->alive == 1) {
+                // Starvation in the EDGE
 
-                cub_die = rbinom(1,(pop_density*STARVATION_2YR));
+                pop_density = (double)individuals_edge/K_indiv_edge;
 
-                if (cub_die == 1) {
-                    current_idv->alive = 0;
+                if (current_idv->age <= 12
+                    && get_individual_edgedrisk(pop, current_idv) == 1
+                    && current_idv->alive == 1) {
+
+                    cub_die = rbinom(1,(pop_density*STARVATION_1YR));
+
+                    if (cub_die == 1) {
+                        current_idv->alive = 0;
+                    }
                 }
-            }
 
-            // Starvation in the EDGE
+                if (current_idv->age > 12
+                    && current_idv->age <= 24
+                    && get_individual_edgedrisk(pop, current_idv) == 1
+                    && current_idv->alive == 1) {
 
-            pop_density = (double)individuals_edge/K_indiv_edge;
+                    cub_die = rbinom(1,(pop_density*STARVATION_2YR));
 
-            if (current_idv->age <= 12
-                && get_individual_edgedrisk(pop, current_idv) == 1
-                && current_idv->alive == 1) {
-
-                cub_die = rbinom(1,(pop_density*STARVATION_1YR));
-
-                if (cub_die == 1) {
-                    current_idv->alive = 0;
+                    if (cub_die == 1) {
+                        current_idv->alive = 0;
+                    }
                 }
-            }
 
-            if (current_idv->age > 12
-                && current_idv->age <= 24
-                && get_individual_edgedrisk(pop, current_idv) == 1
-                && current_idv->alive == 1) {
+                // Infanticide if born into a pride where a member of the coalition is not the father
 
-                cub_die = rbinom(1,(pop_density*STARVATION_2YR));
+                if (current_idv->alive == 1
+                    && current_idv->age == 1
+                    && current_idv->my_pride->the_coalition != NULL
+                    && current_idv->my_pride->the_coalition->age_resident < 5) {
 
-                if (cub_die == 1) {
-                    current_idv->alive = 0;
+                    current_idv -> alive = 0;
+                    cub_killed = 1;
+
                 }
-            }
-
-            // Infanticide if born into a pride where a member of the coalition is not the father
-
-            if (current_idv->alive == 1
-                && current_idv->age == 1
-                && current_idv->my_pride->the_coalition != NULL
-                && current_idv->my_pride->the_coalition->age_resident < 5) {
-
-                current_idv -> alive = 0;
-                cub_killed = 1;
 
             }
 
@@ -2307,7 +2312,11 @@ void coalitions_fight(t_population *pop, long the_month) {
                         prob = (0.0000029539*pow(x,6.0)) - (0.000334047*pow(x,5.0)) + (0.0137274757*pow(x,4.0)) - (0.2391477426*pow(x,3.0)) + (1.4663687561*pow(x,2.0)) - (3.5297032314*x) + 100;
                         prob = prob/100;
 
-                        kill = rbinom(1,prob);
+                        if (current_idv->age < AGE_SURVIVE_INFANTICIDE){
+                          kill = rbinom(1,prob);
+                        }else{
+                          kill = 0;
+                        }
 
                         if (kill == 1
                             && current_idv->age < AGE_SURVIVE_INFANTICIDE) {
@@ -2353,56 +2362,79 @@ void coalitions_fight(t_population *pop, long the_month) {
 
                     // FEMALE individuals disperse and create new pride
 
-                    t_pride *new_pride = create_pride(pop, VAGRANT);
+                    int females_disperse = 0;
 
                     for (int i = 0; i < current_pride->all_members->len; i++) {
-
                         current_idv = g_ptr_array_index(current_pride->all_members, i);
-
                         if ( current_idv->sex == FEMALE
                             && current_idv->age >= AGE_DISPERSAL_F_BEGIN_TRIGGER
-                            && current_idv->age < AGE_DISPERSAL_F_END_TRIGGER) { // AGE_DISPERSAL_F_END
+                            && current_idv->age < AGE_DISPERSAL_F_END_TRIGGER) {
+                              females_disperse++;
+                            }
+                          }
 
-                            individual_leaves_pride(current_idv, current_pride);
-                            individual_joins_pride(current_idv, new_pride);
-                            individual_update_events(current_idv, the_month, DISPERSED);
-                            current_idv->dispersed = DISPERSE;
-                        }
+                    if (females_disperse > 0){
 
-                    }
+                      t_pride *new_pride = create_pride(pop, VAGRANT);
 
-                    if (new_pride->all_members->len == 0) {
+                      for (int i = 0; i < current_pride->all_members->len; i++) {
 
-                        pride_leaves_pop(pop, new_pride);
+                          current_idv = g_ptr_array_index(current_pride->all_members, i);
 
+                          if ( current_idv->sex == FEMALE
+                              && current_idv->age >= AGE_DISPERSAL_F_BEGIN_TRIGGER
+                              && current_idv->age < AGE_DISPERSAL_F_END_TRIGGER) {
+
+                              individual_leaves_pride(current_idv, current_pride);
+                              individual_joins_pride(current_idv, new_pride);
+                              individual_update_events(current_idv, the_month, DISPERSED);
+                              current_idv->dispersed = DISPERSE;
+                          }
+
+                      }
+
+                      if (new_pride->all_members->len == 0) {
+
+                          pride_leaves_pop(pop, new_pride);
+
+                      }
                     }
 
                     // MALE individuals disperse and create new coalition
 
-                    t_coalition *new_coali = create_coalition(pop, VAGRANT);
+                    int males_disperse = 0;
 
                     for (int i = 0; i < current_pride->all_members->len; i++) {
-
                         current_idv = g_ptr_array_index(current_pride->all_members, i);
-
-                        if (current_idv->sex == MALE && current_idv->age >= AGE_SURVIVE_INFANTICIDE) { // AGE_SURVIVE_INFANTICIDE
-
-                            individual_leaves_pride(current_idv, current_pride);
-                            individual_joins_coalition(current_idv, new_coali);
-                            individual_update_events(current_idv, the_month, DISPERSED);
-                            current_idv->dispersed = DISPERSE;
+                        if (current_idv->sex == MALE && current_idv->age >= AGE_SURVIVE_INFANTICIDE) {
+                          males_disperse++;
                         }
+                      }
 
+                    if (males_disperse > 0){
+
+                      t_coalition *new_coali = create_coalition(pop, VAGRANT);
+
+                      for (int i = 0; i < current_pride->all_members->len; i++) {
+
+                          current_idv = g_ptr_array_index(current_pride->all_members, i);
+
+                          if (current_idv->sex == MALE && current_idv->age >= AGE_SURVIVE_INFANTICIDE) { // AGE_SURVIVE_INFANTICIDE
+
+                              individual_leaves_pride(current_idv, current_pride);
+                              individual_joins_coalition(current_idv, new_coali);
+                              individual_update_events(current_idv, the_month, DISPERSED);
+                              current_idv->dispersed = DISPERSE;
+                          }
+
+                      }
+
+                      if (new_coali->all_members->len == 0) {
+
+                          coalition_leaves_pop(pop, new_coali);
+
+                      }
                     }
-
-                    if (new_coali->all_members->len == 0) {
-
-                        coalition_leaves_pop(pop, new_coali);
-
-                    }
-
-
-                    //} // part of initial for loop
 
                     // challenged_coali no longer available
 
@@ -2427,8 +2459,6 @@ void coalitions_fight(t_population *pop, long the_month) {
                     // individuals in defeated coalition have x% chance of dying if there is a physical encounter (determined by range of probabilities)
 
                     if (p >= 0.15){
-
-
 
                         for (int i = 0; i < challenged_coali->all_members->len; i++) {
                             current_idv = (t_individual*)g_ptr_array_index(challenged_coali->all_members, i);
@@ -2506,9 +2536,9 @@ void coalitions_meet_prides(t_population *pop, long the_month) {
 
         current_pride = current_pride->next;
     }
-
-    g_ptr_array_sort (array_pride_no_coali, (GCompareFunc) compare_pride_size);
-
+    if (array_pride_no_coali->len != 0) {
+        g_ptr_array_sort (array_pride_no_coali, (GCompareFunc) compare_pride_size);
+    }
     // Look for coalitions with no pride
 
     GPtrArray *array_coali_no_pride = g_ptr_array_sized_new(pop->number_coalitions);
@@ -2525,8 +2555,9 @@ void coalitions_meet_prides(t_population *pop, long the_month) {
 
         current_coali = current_coali->next;
     }
-
-    g_ptr_array_sort (array_coali_no_pride, (GCompareFunc) compare_nprides_btw_coalitions);
+    if (array_coali_no_pride->len != 0) {
+        g_ptr_array_sort (array_coali_no_pride, (GCompareFunc) compare_nprides_btw_coalitions);
+    }
 
     int kill;
     double space;
@@ -2585,7 +2616,15 @@ void coalitions_meet_prides(t_population *pop, long the_month) {
                 prob = (0.0000029539*pow(x,6.0)) - (0.000334047*pow(x,5.0)) + (0.0137274757*pow(x,4.0)) - (0.2391477426*pow(x,3.0)) + (1.4663687561*pow(x,2.0)) - (3.5297032314*x) + 100;
                 prob = prob/100;
 
-                kill = rbinom(1,prob);
+                //if (prob > 1)
+                //    Rprintf(" %f", prob);
+
+
+                if(current_idv->age < AGE_SURVIVE_INFANTICIDE){
+                  kill = rbinom(1,prob);
+                }else{
+                  kill = 0;
+                }
 
                 if (kill == 1
                     && current_idv->age < AGE_SURVIVE_INFANTICIDE) {
@@ -2625,52 +2664,78 @@ void coalitions_meet_prides(t_population *pop, long the_month) {
 
             // FEMALE individuals disperse and create new pride
 
-            t_pride *new_pride = create_pride(pop, VAGRANT);
+            int females_disperse = 0;
 
             for (int i = 0; i < current_pride->all_members->len; i++) {
-
                 current_idv = g_ptr_array_index(current_pride->all_members, i);
-
                 if ( current_idv->sex == FEMALE
                     && current_idv->age >= AGE_DISPERSAL_F_BEGIN_TRIGGER
                     && current_idv->age < AGE_DISPERSAL_F_END_TRIGGER) {
+                      females_disperse++;
+                    }
+                  }
 
-                    individual_leaves_pride(current_idv, current_pride);
-                    individual_joins_pride(current_idv, new_pride);
-                    individual_update_events(current_idv, the_month, DISPERSED);
-                    current_idv->dispersed = DISPERSE;
-                }
+            if (females_disperse > 0){
 
-            }
+              t_pride *new_pride = create_pride(pop, VAGRANT);
 
-            if (new_pride->all_members->len == 0) {
+              for (int i = 0; i < current_pride->all_members->len; i++) {
 
-                pride_leaves_pop(pop, new_pride);
+                  current_idv = g_ptr_array_index(current_pride->all_members, i);
 
+                  if ( current_idv->sex == FEMALE
+                      && current_idv->age >= AGE_DISPERSAL_F_BEGIN_TRIGGER
+                      && current_idv->age < AGE_DISPERSAL_F_END_TRIGGER) {
+
+                      individual_leaves_pride(current_idv, current_pride);
+                      individual_joins_pride(current_idv, new_pride);
+                      individual_update_events(current_idv, the_month, DISPERSED);
+                      current_idv->dispersed = DISPERSE;
+                  }
+
+              }
+
+              if (new_pride->all_members->len == 0) {
+
+                  pride_leaves_pop(pop, new_pride);
+
+              }
             }
 
             // MALE individuals disperse and create new coalition
 
-            t_coalition *new_coali = create_coalition(pop, VAGRANT);
+            int males_disperse = 0;
 
             for (int i = 0; i < current_pride->all_members->len; i++) {
-
                 current_idv = g_ptr_array_index(current_pride->all_members, i);
-
-                if (current_idv->sex == MALE && current_idv->age >= AGE_SURVIVE_INFANTICIDE ) { //AGE_SURVIVE_INFANTICIDE
-
-                    individual_leaves_pride(current_idv, current_pride);
-                    individual_joins_coalition(current_idv, new_coali);
-                    individual_update_events(current_idv, the_month, DISPERSED);
-                    current_idv->dispersed = DISPERSE;
+                if (current_idv->sex == MALE && current_idv->age >= AGE_SURVIVE_INFANTICIDE) {
+                  males_disperse++;
                 }
+              }
 
-            }
+            if (males_disperse > 0){
 
-            if (new_coali->all_members->len == 0) {
+              t_coalition *new_coali = create_coalition(pop, VAGRANT);
 
-                coalition_leaves_pop(pop, new_coali);
+              for (int i = 0; i < current_pride->all_members->len; i++) {
 
+                  current_idv = g_ptr_array_index(current_pride->all_members, i);
+
+                  if (current_idv->sex == MALE && current_idv->age >= AGE_SURVIVE_INFANTICIDE) { // AGE_SURVIVE_INFANTICIDE
+
+                      individual_leaves_pride(current_idv, current_pride);
+                      individual_joins_coalition(current_idv, new_coali);
+                      individual_update_events(current_idv, the_month, DISPERSED);
+                      current_idv->dispersed = DISPERSE;
+                  }
+
+              }
+
+              if (new_coali->all_members->len == 0) {
+
+                  coalition_leaves_pop(pop, new_coali);
+
+              }
             }
 
 
@@ -3051,10 +3116,13 @@ void free_population(t_population *pop) {
     while (pop->all_coalitions != NULL) {
         next_coali = pop->all_coalitions->next;
         g_ptr_array_free(pop->all_coalitions->all_members);
+        g_ptr_array_free(pop->all_coalitions->the_prides);
         free(pop->all_coalitions);
         pop->all_coalitions = next_coali;
     }
 
     free(pop->live_stats);
+    
+    free(pop);
 
 }

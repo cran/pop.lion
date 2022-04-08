@@ -28,7 +28,7 @@
 
 
 void mc_allocate_statistics(struct statistics *stats);
-void mc_free_results(struct statistics *stats);
+void mc_free_statistics(struct statistics *stats);
 void monte_carlo(struct statistics *stats);
 
 #endif

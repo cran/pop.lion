@@ -50,7 +50,7 @@ void mc_allocate_statistics(struct statistics *stats) {
         }
     }
     
-    stats->history_individuals = malloc(sizeof(t_history));
+//    stats->history_individuals = malloc(sizeof(t_history));
     stats->history_individuals = NULL;
     
 }
@@ -59,7 +59,7 @@ void mc_allocate_statistics(struct statistics *stats) {
 // Free results
 /////////////////////////////////////////////////////////////////////////////////
 
-void mc_free_results(struct statistics *stats) {
+void mc_free_statistics(struct statistics *stats) {
     
     for (long i = 0; i < R_number_mc_runs; i++) {
         for (long j = 0; j < number_of_months; j++) {
@@ -69,12 +69,12 @@ void mc_free_results(struct statistics *stats) {
     }
     free(stats->runs);
     
-    t_history *next_hy;
+    t_history *temp_hy;
     while (stats->history_individuals != NULL) {
-        next_hy = stats->history_individuals->next;
-        free(stats->history_individuals->events_individual);
-        free(stats->history_individuals);
-        stats->history_individuals = next_hy;
+        temp_hy = stats->history_individuals;
+        stats->history_individuals = stats->history_individuals->next;
+        free(temp_hy->events_individual);
+        free(temp_hy);
     }
     free(stats->history_individuals);
     
@@ -127,7 +127,6 @@ void monte_carlo(struct statistics *stats) {
         }
         
         free_population(pop);
-        free(pop);
         
     }
     

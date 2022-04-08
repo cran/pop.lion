@@ -25,14 +25,14 @@
 
 typedef struct t_history t_history;
 
-struct t_history {
-    int *events_individual; // This is passed from the individual. Be careful to not free it when releasing the individual.
-    t_history *next;
-};
-
 struct statistics {
     double ***runs;
     t_history *history_individuals;
+};
+
+struct t_history {
+    int *events_individual; // This is passed from the individual. Be careful to not free it when releasing the individual.
+    t_history *next;
 };
 
 double beta_shape(double mu, double sigma);
